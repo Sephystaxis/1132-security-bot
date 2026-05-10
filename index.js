@@ -44,6 +44,9 @@ Reminder for future access:
 • Read channel descriptions before interacting
 • Respect interaction boundaries per channel
 • When in doubt, observe first, engage second
+
+Reset your password and Join the server once you secured your account
+https://discord.gg/wanwantritu
 `;
 
 client.once("ready", () => {
