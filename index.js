@@ -22,7 +22,7 @@ const WHITELIST_ROLE_IDS = [
 
 // 📩 DM MESSAGE
 const dmMessage = `
-System Notice
+# System Notice
 
 You’ve been removed from the server by the 1132 Security Bot.
 
