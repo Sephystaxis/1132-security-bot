@@ -28,8 +28,6 @@ const WHITELIST_ROLE_IDS = [
 // DM MESSAGE
 // =========================
 const dmMessage = `
-System Notice
-
 You’ve been removed from the server by the 1132 Security Bot.
 
 Reason:
@@ -56,7 +54,7 @@ https://discord.gg/wanwantritu
 `;
 
 // =========================
-// READY
+// READY EVENT
 // =========================
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
@@ -70,40 +68,42 @@ client.on("messageCreate", async (message) => {
   if (!message.guild) return;
 
   // =========================
-  // ADMIN BYPASS
-  // =========================
-  if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
-
-  // =========================
-  // ROLE WHITELIST BYPASS
-  // =========================
-  const isWhitelisted = message.member.roles.cache.some(role =>
-    WHITELIST_ROLE_IDS.includes(role.id)
-  );
-  if (isWhitelisted) return;
-
-  // =========================
   // HONEYPOT SYSTEM
   // =========================
   if (message.channel.id === HONEYPOT_CHANNEL_ID) {
     try {
-      await message.author.send(dmMessage);
-    } catch {
-      console.log("DM failed");
+      await message.delete();
+    } catch (err) {
+      console.log("Delete failed:", err);
     }
 
+    // admin bypass
+    if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
+
+    // whitelist bypass
+    const isWhitelisted = message.member.roles.cache.some(role =>
+      WHITELIST_ROLE_IDS.includes(role.id)
+    );
+    if (isWhitelisted) return;
+
     try {
-      await message.member.kick("Honeypot trigger");
+      await message.member.kick("Honeypot trigger - restricted channel message");
       console.log(`[HONEYPOT] Kicked ${message.author.tag}`);
     } catch (err) {
       console.log("Kick failed:", err);
+    }
+
+    try {
+      await message.author.send(dmMessage);
+    } catch (err) {
+      console.log("DM failed (user blocked DMs)");
     }
 
     return;
   }
 
   // =========================
-  // SAFE COMMAND (TEST)
+  // TEST COMMAND
   // =========================
   if (message.content === "+ping") {
     message.reply("🏓 1132 bot is online");
