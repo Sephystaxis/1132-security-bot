@@ -84,5 +84,3 @@ client.on("messageCreate", async (message) => {
 });
 
 client.login(process.env.TOKEN);
-
-can you add the engagement code here?
