@@ -1,4 +1,9 @@
-const { Client, GatewayIntentBits, PermissionsBitField } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  PermissionsBitField,
+  EmbedBuilder
+} = require("discord.js");
 
 const client = new Client({
   intents: [
@@ -12,13 +17,16 @@ const client = new Client({
 // 🔒 HONEYPOT CHANNEL ID
 const HONEYPOT_CHANNEL_ID = "1502873326014435388";
 
-// 🔒 WHITELIST ROLES (REPLACE WITH REAL ROLE IDS)
+// 🔒 WHITELIST ROLES
 const WHITELIST_ROLE_IDS = [
   "1352840869514051639",
   "1368901928498495589",
   "1477667283387289663",
   "1477667526249943140"
 ];
+
+// 💰 SIMPLE IN-MEMORY ECONOMY (for now)
+const users = {};
 
 // 📩 DM MESSAGE
 const dmMessage = `
@@ -29,33 +37,31 @@ You’ve been removed from the server by the 1132 Security Bot.
 Reason:
 • Direct messaging in a restricted channel
 
-This space is structured to protect flow, privacy, and channel intent.
-
-What this means for you:
-• Some channels are read-only or interaction-limited
-• Messaging there triggers automatic enforcement
-• This action is not personal
-
-If you believe this was a mistake, you may reach out to a moderator for review.
-
-⸻
-
-Reminder for future access:
-• Read channel descriptions before interacting
-• Respect interaction boundaries per channel
-• When in doubt, observe first, engage second
-
-Reset your password and join the server once you have secured your account
-https://discord.gg/wanwantritu
+This action is automatic and not personal.
 `;
 
+// ===================== READY =====================
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
+// ===================== MESSAGE SYSTEM =====================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
   if (!message.guild) return;
+
+  const userId = message.author.id;
+
+  // INIT USER
+  if (!users[userId]) {
+    users[userId] = {
+      balance: 0,
+      lastDaily: 0,
+      lastMessage: 0
+    };
+  }
+
+  const user = users[userId];
 
   // 🔒 ADMIN BYPASS
   if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
@@ -66,13 +72,98 @@ client.on("messageCreate", async (message) => {
   );
   if (isWhitelisted) return;
 
-  // 🎯 HONEYPOT TRIGGER
+  // 💰 PASSIVE EARNING (chat reward cooldown)
+  const now = Date.now();
+  if (now - user.lastMessage > 60000) {
+    const earned = Math.floor(Math.random() * 10) + 5;
+    user.balance += earned;
+    user.lastMessage = now;
+  }
+
+  // ================= COMMANDS =================
+  const prefix = "!";
+  if (!message.content.startsWith(prefix)) return;
+
+  const args = message.content.slice(prefix.length).trim().split(/ +/);
+  const cmd = args.shift().toLowerCase();
+
+  // 💰 BALANCE
+  if (cmd === "bal") {
+    return message.reply(`💰 You have **${user.balance} Fibers**.`);
+  }
+
+  // 🎁 DAILY
+  if (cmd === "daily") {
+    const now = Date.now();
+    if (now - user.lastDaily < 86400000) {
+      return message.reply("⏳ You already claimed daily reward.");
+    }
+
+    user.balance += 100;
+    user.lastDaily = now;
+
+    return message.reply("🎁 You claimed **100 Fibers**!");
+  }
+
+  // 🎮 JANKEN POI
+  if (cmd === "janken" || cmd === "rps") {
+    const choices = ["rock", "paper", "scissors"];
+    const player = args[0]?.toLowerCase();
+
+    if (!choices.includes(player)) {
+      return message.reply("Use: !janken rock/paper/scissors");
+    }
+
+    const bot = choices[Math.floor(Math.random() * choices.length)];
+
+    let result = "";
+
+    if (player === bot) {
+      result = "🤝 Draw!";
+    } else if (
+      (player === "rock" && bot === "scissors") ||
+      (player === "paper" && bot === "rock") ||
+      (player === "scissors" && bot === "paper")
+    ) {
+      user.balance += 25;
+      result = "🎉 You win +25 Fibers!";
+    } else {
+      user.balance = Math.max(0, user.balance - 10);
+      result = "💀 You lost -10 Fibers!";
+    }
+
+    return message.reply(`You: ${player}\nBot: ${bot}\n\n${result}`);
+  }
+
+  // 🎳 BOWLING GAME
+  if (cmd === "bowl") {
+    let pins = ["🎳", "📍", "📍", "📍", "📍", "📍", "📍"];
+
+    const msg = await message.reply(`🎳 Bowling Lane\n\n${pins.join(" ")}`);
+
+    let remaining = 6;
+
+    const interval = setInterval(async () => {
+      if (remaining <= 0) {
+        clearInterval(interval);
+
+        user.balance += 150;
+
+        return msg.edit("💥 STRIKE!\n\nYou earned 150 Fibers!");
+      }
+
+      pins[remaining] = "💥";
+      remaining--;
+
+      await msg.edit(`🎳 Bowling Lane\n\n${pins.join(" ")}`);
+    }, 800);
+  }
+
+  // ================= HONEYPOT =================
   if (message.channel.id === HONEYPOT_CHANNEL_ID) {
     try {
       await message.author.send(dmMessage);
-    } catch (err) {
-      console.log("DM failed (user has DMs disabled)");
-    }
+    } catch {}
 
     try {
       await message.member.kick("Honeypot trigger");
