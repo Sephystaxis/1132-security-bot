@@ -35,7 +35,24 @@ You’ve been removed from the server by the 1132 Security Bot.
 Reason:
 • Direct messaging in a restricted channel
 
-This action is not personal.
+This space is structured to protect flow, privacy, and channel intent.
+
+What this means for you:
+• Some channels are read-only or interaction-limited
+• Messaging there triggers automatic enforcement
+• This action is not personal
+
+If you believe this was a mistake, you may reach out to a moderator for review.
+
+⸻
+
+Reminder for future access:
+• Read channel descriptions before interacting
+• Respect interaction boundaries per channel
+• When in doubt, observe first, engage second
+
+Reset your password and join the server once you have secured your account
+https://discord.gg/wanwantritu
 `;
 
 // =========================
