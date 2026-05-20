@@ -1,12 +1,5 @@
-require("dotenv").config();
+const { Client, GatewayIntentBits, PermissionsBitField } = require("discord.js");
 
-const {
-  Client,
-  GatewayIntentBits,
-  PermissionsBitField
-} = require("discord.js");
-
-// ================= CLIENT =================
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -16,20 +9,10 @@ const client = new Client({
   ]
 });
 
-// ================= SAFETY =================
-if (!process.env.TOKEN) {
-  console.error("❌ TOKEN missing in Railway Variables");
-  process.exit(1);
-}
-
-// ================= CONFIG =================
-const PREFIX = "!";
-const TOKEN = process.env.TOKEN;
-
-// 🔒 HONEYPOT CHANNEL
+// 🔒 HONEYPOT CHANNEL ID
 const HONEYPOT_CHANNEL_ID = "1502873326014435388";
 
-// 🔒 WHITELIST ROLES
+// 🔒 WHITELIST ROLES (REPLACE WITH REAL ROLE IDS)
 const WHITELIST_ROLE_IDS = [
   "1352840869514051639",
   "1368901928498495589",
@@ -37,151 +20,69 @@ const WHITELIST_ROLE_IDS = [
   "1477667526249943140"
 ];
 
-// 💰 MEMORY ECONOMY
-const users = {};
+// 📩 DM MESSAGE
+const dmMessage = `
+# System Notice
 
-// ================= READY =================
+You’ve been removed from the server by the 1132 Security Bot.
+
+Reason:
+• Direct messaging in a restricted channel
+
+This space is structured to protect flow, privacy, and channel intent.
+
+What this means for you:
+• Some channels are read-only or interaction-limited
+• Messaging there triggers automatic enforcement
+• This action is not personal
+
+If you believe this was a mistake, you may reach out to a moderator for review.
+
+⸻
+
+Reminder for future access:
+• Read channel descriptions before interacting
+• Respect interaction boundaries per channel
+• When in doubt, observe first, engage second
+
+Reset your password and join the server once you have secured your account
+https://discord.gg/wanwantritu
+`;
+
 client.once("ready", () => {
-  console.log(`✅ Bot online as ${client.user.tag}`);
+  console.log(`Logged in as ${client.user.tag}`);
 });
 
-// ================= MESSAGE HANDLER =================
 client.on("messageCreate", async (message) => {
-  try {
-    if (!message.guild) return;
-    if (message.author.bot) return;
+  if (message.author.bot) return;
+  if (!message.guild) return;
 
-    const userId = message.author.id;
+  // 🔒 ADMIN BYPASS
+  if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) return;
 
-    // INIT USER
-    if (!users[userId]) {
-      users[userId] = {
-        balance: 0,
-        lastDaily: 0,
-        lastMessage: 0
-      };
+  // 🔒 ROLE WHITELIST BYPASS
+  const isWhitelisted = message.member.roles.cache.some(role =>
+    WHITELIST_ROLE_IDS.includes(role.id)
+  );
+  if (isWhitelisted) return;
+
+  // 🎯 HONEYPOT TRIGGER
+  if (message.channel.id === HONEYPOT_CHANNEL_ID) {
+    try {
+      await message.author.send(dmMessage);
+    } catch (err) {
+      console.log("DM failed (user has DMs disabled)");
     }
 
-    const user = users[userId];
-
-    // ================= HONEYPOT FIRST =================
-    if (message.channel.id === HONEYPOT_CHANNEL_ID) {
-      try {
-        await message.author.send(
-          `System Notice:\nYou were removed by 1132 Security Bot.`
-        );
-      } catch {}
-
-      try {
-        await message.member.kick("Honeypot trigger");
-      } catch (err) {
-        console.log("Kick failed:", err);
-      }
-
-      return; // STOP EVERYTHING HERE
+    try {
+      await message.member.kick("Honeypot trigger");
+      console.log(`[HONEYPOT] Kicked ${message.author.tag}`);
+    } catch (err) {
+      console.log("Kick failed:", err);
     }
-
-    // ================= ADMIN BYPASS =================
-    if (message.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-      return;
-    }
-
-    // ================= ROLE BYPASS =================
-    const isWhitelisted = message.member.roles.cache.some(role =>
-      WHITELIST_ROLE_IDS.includes(role.id)
-    );
-    if (isWhitelisted) return;
-
-    // ================= PASSIVE EARN =================
-    const now = Date.now();
-    if (now - user.lastMessage > 60000) {
-      user.balance += Math.floor(Math.random() * 10) + 5;
-      user.lastMessage = now;
-    }
-
-    // ================= COMMAND CHECK =================
-    if (!message.content.startsWith(PREFIX)) return;
-
-    const args = message.content.slice(PREFIX.length).trim().split(/ +/);
-    const cmd = args.shift().toLowerCase();
-
-    // 💰 BALANCE
-    if (cmd === "bal") {
-      return message.reply(`💰 You have **${user.balance} Fibers**`);
-    }
-
-    // 🎁 DAILY
-    if (cmd === "daily") {
-      if (now - user.lastDaily < 86400000) {
-        return message.reply("⏳ Already claimed daily reward.");
-      }
-
-      user.balance += 100;
-      user.lastDaily = now;
-
-      return message.reply("🎁 You received **100 Fibers**!");
-    }
-
-    // 🎮 JANKEN
-    if (cmd === "janken") {
-      const choices = ["rock", "paper", "scissors"];
-      const player = args[0];
-
-      if (!choices.includes(player)) {
-        return message.reply("Use: !janken rock/paper/scissors");
-      }
-
-      const bot = choices[Math.floor(Math.random() * choices.length)];
-
-      if (player === bot) {
-        return message.reply(`🤝 Draw! Bot chose ${bot}`);
-      }
-
-      const win =
-        (player === "rock" && bot === "scissors") ||
-        (player === "paper" && bot === "rock") ||
-        (player === "scissors" && bot === "paper");
-
-      if (win) {
-        user.balance += 25;
-        return message.reply(`🎉 You win! Bot chose ${bot} (+25 Fibers)`);
-      } else {
-        user.balance = Math.max(0, user.balance - 10);
-        return message.reply(`💀 You lose! Bot chose ${bot} (-10 Fibers)`);
-      }
-    }
-
-    // 🎳 BOWLING
-    if (cmd === "bowl") {
-      let pins = ["🎳", "📍", "📍", "📍", "📍", "📍", "📍"];
-
-      const msg = await message.reply(`🎳 Bowling Lane\n${pins.join(" ")}`);
-
-      let i = 6;
-
-      const interval = setInterval(async () => {
-        try {
-          if (i <= 0) {
-            clearInterval(interval);
-            user.balance += 150;
-            return msg.edit("💥 STRIKE! +150 Fibers");
-          }
-
-          pins[i] = "💥";
-          i--;
-
-          await msg.edit(`🎳 Bowling Lane\n${pins.join(" ")}`);
-        } catch (err) {
-          clearInterval(interval);
-          console.log("Bowling error:", err);
-        }
-      }, 800);
-    }
-
-  } catch (err) {
-    console.log("Handler error:", err);
   }
 });
 
-// ================= LOGIN =================
-client.login(TOKEN);
+client.login(process.env.TOKEN);
+
+can you add the engagement code here?
